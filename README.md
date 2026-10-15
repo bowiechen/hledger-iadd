@@ -11,8 +11,12 @@ This project improves in the following ways on hledger's `add` command:
  - Interactive as-you-type completion for account names and
    descriptions with optional fuzzy matching (see [below](#configuration-file)).
 
- - Integrated calculator: Amounts can be written as simple sums with
-   real-time feedback on the result.
+ - Integrated calculator: Amounts can be written as arithmetic
+   expressions with `+`, `-`, `*`, `/` and parentheses (e.g.
+   `(12.50 EUR + 3 EUR) * 2`), with real-time feedback on the result.
+   Multiplication and division require a plain number without commodity
+   on one side (the right side for division); results are rounded to the
+   precision of the commodity in the journal.
 
  - All actions while entering a transaction can be undone
 
