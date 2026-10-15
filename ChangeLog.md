@@ -1,3 +1,9 @@
+# Unreleased
+
+  - dependencies: Update stack.yaml to lts-24.60 (GHC 9.10) with hledger-lib
+    1.52 and brick 3.0, so stack builds work again; remove the unused
+    stack-8.2.yaml and stack-8.4.yaml
+
 # 1.3.23  [2026-09-28]
 
   - dependencies: Allow hledger-lib 1.52, vty 6.6, megaparsec 9.9
