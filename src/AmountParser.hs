@@ -129,18 +129,22 @@ plainNumber v = case HL.amountsRaw (valAmount v) of
 
 -- | Round the result of multiplications and divisions.
 --
--- Amounts are rounded to the precision of their commodity in the journal. If
--- the journal doesn't define one, the precision of the entered amount is
+-- Amounts of a commodity with a style in the journal (declared by a
+-- @commodity@ directive or inferred from its amounts) get that style and are
+-- rounded to its precision. Otherwise, the precision of the entered amount is
 -- used, extended to up to two decimal places if the result needs them.
 roundValue :: M.Map HL.CommoditySymbol HL.AmountStyle -> Value -> HL.MixedAmount
 roundValue styles v
   | valScaled v = HL.mapMixedAmount roundAmount (valAmount v)
   | otherwise = valAmount v
   where
-    roundAmount a = HL.setAmountInternalPrecision (precision a) a
-    precision a = case HL.asprecision <$> M.lookup (HL.acommodity a) styles of
-      Just (HL.Precision p) -> p
-      _ -> max (enteredPrecision a) (min 2 (decimalPlaces (normalizeDecimal (HL.aquantity a))))
+    roundAmount a = case M.lookup (HL.acommodity a) styles of
+      Just style -> case HL.asprecision style of
+        HL.Precision p -> HL.setAmountInternalPrecision p a { HL.astyle = style }
+        HL.NaturalPrecision -> a { HL.astyle = style }
+      Nothing -> HL.setAmountInternalPrecision (fallbackPrecision a) a
+    fallbackPrecision a =
+      max (enteredPrecision a) (min 2 (decimalPlaces (normalizeDecimal (HL.aquantity a))))
     enteredPrecision a = case HL.asprecision (HL.astyle a) of
       HL.Precision p -> p
       HL.NaturalPrecision -> 0

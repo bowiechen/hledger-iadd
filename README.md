@@ -15,8 +15,9 @@ This project improves in the following ways on hledger's `add` command:
    expressions with `+`, `-`, `*`, `/` and parentheses (e.g.
    `(12.50 EUR + 3 EUR) * 2`), with real-time feedback on the result.
    Multiplication and division require a plain number without commodity
-   on one side (the right side for division); results are rounded to the
-   precision of the commodity in the journal.
+   on one side (the right side for division); results are rounded and
+   formatted according to the commodity's style in the journal (e.g. as
+   declared with a `commodity` directive).
 
  - All actions while entering a transaction can be undone
 
