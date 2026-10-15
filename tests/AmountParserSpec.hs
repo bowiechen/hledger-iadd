@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import           Data.Text (Text)
 import           Data.Word (Word8)
 import qualified Hledger as HL
+import qualified Hledger.Read.JournalReader as JR
 import           Text.Megaparsec
 
 import           AmountParser
@@ -94,10 +95,17 @@ spec = describe "parseAmount" $ do
   it "only rounds the final result" $
     parseAmount HL.nulljournal "1/3 + 1/3 + 1/3" `shouldBe` Right (amount "1.00")
 
-  it "rounds to the precision of the commodity in the journal" $ do
+  it "rounds to the precision of the commodity inferred from the journal" $ do
     let journal = journalWithStyle "EUR" 2
     parseAmount journal "100 EUR / 3" `shouldBe` Right (amount "33.33 EUR")
     parseAmount journal "10 EUR * 1.2346" `shouldBe` Right (amount "12.35 EUR")
+
+  it "applies the commodity style declared in the journal" $ do
+    journal <- journalFromText "commodity 1.000,00 EUR\ncommodity $1,000.0000\n"
+    showResult (parseAmount journal "100 EUR / 3") `shouldBe` Right "33,33 EUR"
+    showResult (parseAmount journal "10000 EUR * 1.2346") `shouldBe` Right "12.346,00 EUR"
+    showResult (parseAmount journal "$10 / 3") `shouldBe` Right "$3.3333"
+    showResult (parseAmount journal "10 USD / 4") `shouldBe` Right "2.5 USD"
 
   it "fails to multiply two amounts with commodity" $
     parseAmount HL.nulljournal "10 EUR * 2 EUR" `shouldSatisfy` isLeft
@@ -123,6 +131,14 @@ journalWithStyle :: HL.CommoditySymbol -> Word8 -> HL.Journal
 journalWithStyle c p = HL.nulljournal
   { HL.jinferredcommoditystyles = M.singleton c HL.amountstyle
       { HL.ascommodityside = HL.R, HL.ascommodityspaced = True, HL.asprecision = HL.Precision p } }
+
+journalFromText :: Text -> IO HL.Journal
+journalFromText t = do
+  res <- HL.runExceptT $ HL.parseAndFinaliseJournal (JR.journalp HL.definputopts) HL.definputopts "" t
+  either fail return res
+
+showResult :: Either String HL.MixedAmount -> Either String String
+showResult = fmap HL.showMixedAmount
 
 fromRight :: Either a b -> b
 fromRight = either (error "fromRight: Left value encountered") id
