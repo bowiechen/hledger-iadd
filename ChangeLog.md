@@ -1,5 +1,8 @@
 # Unreleased
 
+  - feature: The amount calculator supports multiplication, division and
+    parentheses, e.g. `(12.50 EUR + 3 EUR) * 2`. Results of `*` and `/` are
+    rounded to the precision of the commodity in the journal.
   - dependencies: Update stack.yaml to lts-24.60 (GHC 9.10) with hledger-lib
     1.52 and brick 3.0, so stack builds work again; remove the unused
     stack-8.2.yaml and stack-8.4.yaml
