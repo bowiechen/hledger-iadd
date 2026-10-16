@@ -94,6 +94,21 @@ And finally you're ready to build and install `hledger-iadd`:
 	cabal build
 	cabal copy
 
+#### Pinning dependencies
+
+Dependency versions are defined in two places, and CI builds with both:
+
+- **cabal** picks the newest versions allowed by the bounds in
+  `hledger-iadd.cabal`. After changing a bound, check that it can be
+  satisfied with `cabal build all --dry-run`. To pin exact versions
+  locally, run `cabal freeze`.
+- **stack** uses the snapshot named by `resolver` in `stack.yaml`, which
+  fixes GHC and all package versions. Packages that are missing from the
+  snapshot or too old for `hledger-iadd.cabal` go under `extra-deps` with
+  exact versions (e.g. `hledger-lib-1.52.4`). After changing `stack.yaml`
+  or the bounds in `hledger-iadd.cabal`, run `stack build --test` and
+  commit `stack.yaml` together with the regenerated `stack.yaml.lock`.
+
 ## Usage
 
 *[YouTube video demonstrating basic interactions](https://www.youtube.com/watch?v=ZuCT9EzryaI)*
