@@ -23,9 +23,11 @@ jobs:
 
     # Generate plan.json for the cache key
     - name: Configure the build
+      id: plan
+      shell: bash
       run: |
         cabal configure --enable-tests --enable-benchmarks --disable-documentation
-        cabal build all --dry-run
+        cabal build all --dry-run 2>&1 | tee "$RUNNER_TEMP/plan.log"
 
     - name: Restore cached dependencies
       uses: actions/cache/restore@v4
@@ -38,6 +40,7 @@ jobs:
         restore-keys: ${{ env.key }}-
 
     - name: Install dependencies
+      id: deps
       if: steps.cache.outputs.cache-hit != 'true'
       run: cabal build all --only-dependencies
 
@@ -49,7 +52,79 @@ jobs:
         key: ${{ steps.cache.outputs.cache-primary-key }}
 
     - name: Build
+      id: build
       run: cabal build all
 
     - name: Run tests
+      id: test
       run: cabal test all
+
+    - name: Explain failure
+      if: failure()
+      env:
+        PLAN: ${{ steps.plan.outcome }}
+        DEPS: ${{ steps.deps.outcome }}
+        BUILD: ${{ steps.build.outcome }}
+        TEST: ${{ steps.test.outcome }}
+      run: .github/scripts/explain-failure.sh cabal
+
+  stack:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # Restored before setup so that Stack finds the GHC it installed in
+    # ~/.stack on previous runs instead of downloading it again
+    - name: Restore cached dependencies
+      uses: actions/cache/restore@v4
+      id: cache
+      env:
+        key: ${{ runner.os }}-stack
+      with:
+        path: ~/.stack
+        key: ${{ env.key }}-${{ hashFiles('stack.yaml', 'stack.yaml.lock', '*.cabal') }}
+        restore-keys: ${{ env.key }}-
+
+    - name: Setup Stack
+      uses: haskell-actions/setup@v2
+      with:
+        enable-stack: true
+        stack-no-global: true
+
+    # Fails if the pins in stack.yaml don't satisfy hledger-iadd.cabal or if
+    # stack.yaml.lock doesn't match stack.yaml
+    - name: Check build plan
+      id: plan
+      shell: bash
+      run: stack build --test --dry-run --lock-file error-on-write 2>&1 | tee "$RUNNER_TEMP/plan.log"
+
+    - name: Install dependencies
+      id: deps
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: stack build --test --only-dependencies --lock-file error-on-write
+
+    - name: Save cached dependencies
+      uses: actions/cache/save@v4
+      if: steps.cache.outputs.cache-hit != 'true'
+      with:
+        path: ~/.stack
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+
+    - name: Build
+      id: build
+      run: stack build --test --no-run-tests --lock-file error-on-write
+
+    - name: Run tests
+      id: test
+      run: stack build --test --lock-file error-on-write
+
+    - name: Explain failure
+      if: failure()
+      env:
+        PLAN: ${{ steps.plan.outcome }}
+        DEPS: ${{ steps.deps.outcome }}
+        BUILD: ${{ steps.build.outcome }}
+        TEST: ${{ steps.test.outcome }}
+      run: .github/scripts/explain-failure.sh stack
