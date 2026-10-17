@@ -14,6 +14,10 @@ This project improves in the following ways on hledger's `add` command:
  - Integrated calculator: Amounts can be written as simple sums with
    real-time feedback on the result.
 
+ - Balance assertions: An amount can be followed by a balance assertion
+   like `5 EUR = 100 EUR` (also `==`, `=*` and `==*`). Assertions are
+   checked against the journal before the transaction is added.
+
  - All actions while entering a transaction can be undone
 
  - Configurable format for date input. Instead of `y/m/d` it is also

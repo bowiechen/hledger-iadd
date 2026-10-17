@@ -1,5 +1,8 @@
 # Unreleased
 
+  - feature: Support balance assertions after amounts, e.g. `5 EUR = 100 EUR`.
+    They are checked against the journal before the transaction is added
+    (#42)
   - dependencies: Update stack.yaml to lts-24.60 (GHC 9.10) with hledger-lib
     1.52 and brick 3.0, so stack builds work again; remove the unused
     stack-8.2.yaml and stack-8.4.yaml

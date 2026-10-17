@@ -70,15 +70,16 @@ nextStep journal dateFormat entryText current = case current of
                                        "" -- empty comment
   AccountQuestion trans comment
     | T.null (fromEither entryText) && transactionBalanced trans
-      -> return $ Right $ Step $ FinalQuestion trans (isDuplicateTransaction journal trans)
+      -> return $ checkAssertions journal trans
+                  >> Right (Step $ FinalQuestion trans (isDuplicateTransaction journal trans))
     | T.null (fromEither entryText)  -- unbalanced
       -> return $ Left "Transaction not balanced! Please balance your transaction before adding it to the journal."
     | otherwise        -> return $ Right $ Step $
       AmountQuestion (fromEither entryText) trans comment
-  AmountQuestion name trans comment -> case parseAmount journal (fromEither entryText) of
+  AmountQuestion name trans comment -> case parseAmountWithAssertion journal (fromEither entryText) of
     Left err -> return $ Left (T.pack err)
-    Right amount -> return $ Right $ Step $
-      let newPosting = post' name amount comment
+    Right (amount, assertion) -> return $ Right $ Step $
+      let newPosting = (post' name amount comment) { HL.pbalanceassertion = assertion }
       in AccountQuestion (addPosting newPosting trans) ""
 
   FinalQuestion trans _
@@ -109,7 +110,11 @@ context j matchAlgo _ entryText (AccountQuestion _ _) = return $
   let names = accountsByFrequency j
   in  filter (matches matchAlgo entryText) names
 context journal _ _ entryText (AmountQuestion {}) = return $
-  maybeToList $ T.pack . HL.showMixedAmount <$> trySumAmount journal entryText
+  maybeToList $ showAmountWithAssertion <$> trySumAmount journal entryText
+  where
+    showAmountWithAssertion (amount, assertion) =
+      T.pack (HL.showMixedAmount amount)
+      <> maybe "" ((" " <>) . HL.wbToText . HL.showBalanceAssertion) assertion
 context _ _ _ _  (FinalQuestion _ _) = return []
 
 -- | Suggest the initial text of the entry box for each step
@@ -219,8 +224,16 @@ post' account amount comment = HL.nullposting
 addPosting :: HL.Posting -> HL.Transaction -> HL.Transaction
 addPosting p t = t { HL.tpostings = HL.tpostings t ++ [p] }
 
-trySumAmount :: HL.Journal -> Text -> Maybe HL.MixedAmount
-trySumAmount ctx = either (const Nothing) Just . parseAmount ctx
+trySumAmount :: HL.Journal -> Text -> Maybe (HL.MixedAmount, Maybe HL.BalanceAssertion)
+trySumAmount ctx = either (const Nothing) Just . parseAmountWithAssertion ctx
+
+-- | Check that the balance assertions in the new transaction hold once it is
+-- appended to the journal, so a failing assertion is caught before it is
+-- written instead of on the next journal load.
+checkAssertions :: HL.Journal -> HL.Transaction -> Either Text ()
+checkAssertions journal trans =
+  either (Left . T.pack) (const $ Right ()) $
+    HL.transactionCheckAssertions HL.defbalancingopts journal trans
 
 
 -- | Given a previous similar transaction, suggest the next posting to enter

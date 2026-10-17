@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase #-}
 
 module ModelSpec (spec) where
 
@@ -23,6 +23,7 @@ spec = do
   describe "setTransactionComment" setTransactionCommentSpec
   describe "isDuplicateTransaction" isDuplicateTransactionSpec
   describe "isSubsetTransaction" isSubsetTransactionSpec
+  describe "balance assertions" balanceAssertionSpec
 
 suggestSpec :: Spec
 suggestSpec = do
@@ -222,6 +223,36 @@ type Date = (Integer,Int,Int) -- y, d, m
 
 -- | Creates a mock-journal from a list of transactions
 --
+balanceAssertionSpec :: Spec
+balanceAssertionSpec = do
+  -- x has a balance of €10 before the new transaction
+  let j = mkJournal [ ((2017, 1, 1), "Foo", [("x", 10), ("y", -10)]) ]
+      start = AccountQuestion (mkTransaction ((2017, 1, 2), "Bar", [])) ""
+      enter amount = answers j ["x", amount, "y", "€-5", ""] start
+
+  it "stores the assertion in the posting" $ do
+    Right (Step (AccountQuestion t _)) <- answers j ["x", "€5 == €15"] start
+    let summary a = (HL.acommodity (HL.baamount a), HL.aquantity (HL.baamount a), HL.batotal a)
+    map (fmap summary . HL.pbalanceassertion) (HL.tpostings t)
+      `shouldBe` [Just ("€", 15, True)]
+
+  it "accepts a transaction whose assertion holds" $ do
+    result <- enter "€5 = €15"
+    case result of
+      Right (Step (FinalQuestion _ _)) -> return ()
+      other -> expectationFailure ("unexpected result: " ++ show other)
+
+  it "rejects a transaction whose assertion fails" $ do
+    result <- enter "€5 = €20"
+    result `shouldSatisfy` either (T.isInfixOf "Balance assertion failed") (const False)
+
+-- | Answer the prompts with the given inputs, one after another
+answers :: HL.Journal -> [Text] -> Step -> IO (Either Text MaybeStep)
+answers _ [] step = return (Right (Step step))
+answers j (x:xs) step = nextStep j german (Left x) step >>= \case
+  Right (Step step') -> answers j xs step'
+  other -> return other
+
 -- Transactions consists of the date, a description and a list of postings in
 -- for form of (account, amount)
 mkJournal :: [(Date, Text, [(Text, Int)])] -> HL.Journal
