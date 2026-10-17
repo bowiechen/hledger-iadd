@@ -10,8 +10,9 @@ description:         This is a terminal UI as drop-in replacement for hledger ad
                          fuzzy matching.
                      .
                        * Integrated calculator: Amounts can be written
-                         as simple sums with real-time feedback on the
-                         result.
+                         as arithmetic expressions with @+@, @-@, @*@,
+                         @\/@ and parentheses with real-time feedback on
+                         the result.
                      .
                        * All actions while entering a transaction can
                          be undone
@@ -80,6 +81,7 @@ library
                      , xdg-basedir
                      , unordered-containers
                      , free >= 4.12.4
+                     , Decimal
   ghc-options:         -Wall -fdefer-typed-holes -fno-warn-name-shadowing
 
 executable hledger-iadd
@@ -128,6 +130,7 @@ test-suite spec
                     , QuickCheck
                     , quickcheck-instances
                     , free >= 4.12.4
+                    , containers
                     , megaparsec >= 7.0 && <9.9
                     , text-zipper >= 0.10
   build-tool-depends: hspec-discover:hspec-discover ==2.*

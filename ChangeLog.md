@@ -1,5 +1,8 @@
 # Unreleased
 
+  - feature: The amount calculator supports multiplication, division and
+    parentheses, e.g. `(12.50 EUR + 3 EUR) * 2`. Results of `*` and `/` are
+    rounded and formatted according to the commodity's style in the journal.
   - feature: Support balance assertions after amounts, e.g. `5 EUR = 100 EUR`.
     They are checked against the journal before the transaction is added
     (#42)
