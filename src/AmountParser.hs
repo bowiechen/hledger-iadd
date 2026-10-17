@@ -1,6 +1,7 @@
-module AmountParser (parseAmount) where
+module AmountParser (parseAmount, parseAmountWithAssertion) where
 
 import           Control.Monad (void, when)
+import           Data.Bifunctor (first)
 import           Data.Char (isDigit)
 import           Data.Decimal (decimalPlaces, normalizeDecimal)
 import           Data.Functor.Identity
@@ -31,9 +32,21 @@ data Value = Value
 -- parentheses. Multiplication and division require one side (the right side
 -- for division) to be a plain number without commodity.
 parseAmount :: HL.Journal -> Text -> Either String HL.MixedAmount
-parseAmount journal t = case runIdentity $ runParserT (evalStateT (space *> expr <* eof) journal) "" t of
-  Left err -> Left (errorBundlePretty err)
-  Right res -> Right (roundValue (HL.journalCommodityStyles journal) res)
+parseAmount journal =
+  fmap (roundValue (HL.journalCommodityStyles journal)) . runAmountParser expr journal
+
+-- | Like 'parseAmount', but the expression may be followed by a balance
+-- assertion in journal syntax, e.g. @5 EUR * 2 = 100 EUR@.
+parseAmountWithAssertion :: HL.Journal -> Text -> Either String (HL.MixedAmount, Maybe HL.BalanceAssertion)
+parseAmountWithAssertion journal =
+  fmap (first (roundValue (HL.journalCommodityStyles journal)))
+  . runAmountParser ((,) <$> expr <*> optional HL.balanceassertionp) journal
+
+runAmountParser :: Parser a -> HL.Journal -> Text -> Either String a
+runAmountParser p journal t =
+  case runIdentity $ runParserT (evalStateT (space *> p <* eof) journal) "" t of
+    Left err -> Left (errorBundlePretty err)
+    Right res -> Right res
 
 expr :: Parser Value
 expr = term >>= rest
@@ -74,8 +87,8 @@ operand = do
 -- | Number of characters at the beginning of the input that belong to the
 -- next amount.
 --
--- The amount ends at the first operator or parenthesis outside of a quoted
--- commodity symbol. Signs are only treated as operators after the first digit
+-- The amount ends at the first operator, parenthesis or @=@ (start of a balance
+-- assertion) outside of a quoted commodity symbol. Signs are only treated as operators after the first digit
 -- (to allow @$-5@) and if they are not part of an exponent (like in @1E-3@).
 operandLength :: String -> Int
 operandLength = go 0 False ' ' ' '
@@ -91,7 +104,7 @@ operandLength = go 0 False ' ' ' '
            [] -> n'
            (_:rest') -> go (n' + 1) digit '"' p1 rest'
     go n digit p1 p2 (c:cs)
-      | c `elem` ("*/()" :: String) = n
+      | c `elem` ("*/()=" :: String) = n
       | c `elem` ("+-" :: String) && not signAllowed = n
       | otherwise = go (n + 1) (digit || isDigit c) c p1 cs
       where signAllowed = not digit || (p1 `elem` ("eE" :: String) && isDigit p2)
